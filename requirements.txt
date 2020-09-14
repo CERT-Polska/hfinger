@@ -1,0 +1,2 @@
+fnvhash==0.1.0
+python-magic==0.4.18
