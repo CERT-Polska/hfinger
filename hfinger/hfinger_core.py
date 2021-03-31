@@ -3,7 +3,7 @@ from collections import Counter, OrderedDict
 import json
 import math
 from pathlib import Path
-from hfinger.configs.configs import AEVAL, CONNVAL, CONTENC, CACHECONT, TE, ACCPTCHAR, METHODS
+from hfinger.configs import AEVAL, CONNVAL, CONTENC, CACHECONT, TE, ACCPTCHAR, METHODS
 import sys
 
 
@@ -22,12 +22,15 @@ def entropy(bstr):
     return -sum(count / lns * math.log(count / lns, 2) for count in p.values())
 
 
-def check_entropy(hexstr):
-    bstr = bytes.fromhex(hexstr)
+def get_entropy(bstr):
     return str(round(entropy(bstr), 1))
 
 
-def check_hdr_case(hdr):
+def get_length(bstr):
+    return str(round(math.log10(len(bstr)), 1))
+
+
+def get_hdr_case(hdr):
     if "-" in hdr:
         t = hdr.split("-")
         for i in t:
@@ -40,7 +43,7 @@ def check_hdr_case(hdr):
 
 
 # Checking method and proto version
-def check_method_version(pkt):
+def get_method_version(pkt):
     r_ver = ""
     r_meth = ""
     # Checking if HTTP version is provided, if not assuming it is HTTP 0.9 per www.w3.org/Protocols/HTTP/Request.html
@@ -80,14 +83,14 @@ def check_method_version(pkt):
 
 
 # Checking header order - assuming that header field contains ":"
-def check_hdr_order(pkt):
+def get_hdr_order(pkt):
     ret = []
     for i in pkt[1:]:
         t = i.split(":")[0]
         t_low = t.lower()
         k = format(fnv1a_32(t.encode()), "x")
         if t_low in HDRL:
-            if check_hdr_case(t):
+            if get_hdr_case(t):
                 k = HDRL[t_low]
             else:
                 k = "!" + HDRL[t_low]
@@ -95,7 +98,7 @@ def check_hdr_order(pkt):
     return ",".join(ret)
 
 
-def check_ua_value(hdr):
+def get_ua_value(hdr):
     val = hdr.split(":")[1]
     if val[0] == " ":
         val = val[1:]
@@ -104,7 +107,7 @@ def check_ua_value(hdr):
     return ret
 
 
-def check_hdr_value(hdr, hdrname, hdr_value_table):
+def get_hdr_value(hdr, hdrname, hdr_value_table):
     val = hdr.split(":")[1]
     if val[0] == " ":
         val = val[1:]
@@ -138,7 +141,7 @@ def check_hdr_value(hdr, hdrname, hdr_value_table):
     return hdr_coded + ",".join(ret)
 
 
-def check_content_type(hdr):
+def get_content_type(hdr):
     val = hdr.split(":")[1]
     if val[0] == " ":
         val = val[1:]
@@ -184,36 +187,36 @@ def check_content_type(hdr):
     return hdr_coded + ",".join(ret)
 
 
-def check_accept_language_value(hdr):
+def get_accept_language_value(hdr):
     val = hdr.split(":")[1]
     name = HDRL["accept-language"]
     ret = name + ":" + format(fnv1a_32(val.encode()), "x")
     return ret
 
 
-def check_pop_hdr_val2(pkt):
+def get_pop_hdr_val(pkt):
     r = []
     for i in pkt[1:]:
         t = i.split(":")[0].lower()
         if t == "connection":
-            r.append(check_hdr_value(i, "connection", CONNVAL))
+            r.append(get_hdr_value(i, "connection", CONNVAL))
         elif t == "accept-encoding":
-            r.append(check_hdr_value(i, "accept-encoding", AEVAL))
+            r.append(get_hdr_value(i, "accept-encoding", AEVAL))
         elif t == "content-encoding":
-            r.append(check_hdr_value(i, "content-encoding", CONTENC))
+            r.append(get_hdr_value(i, "content-encoding", CONTENC))
         elif t == "cache-control":
-            r.append(check_hdr_value(i, "cache-control", CACHECONT))
+            r.append(get_hdr_value(i, "cache-control", CACHECONT))
         elif t == "te":
-            r.append(check_hdr_value(i, "te", TE))
+            r.append(get_hdr_value(i, "te", TE))
         elif t == "accept-charset":
-            r.append(check_hdr_value(i, "accept-charset", ACCPTCHAR))
+            r.append(get_hdr_value(i, "accept-charset", ACCPTCHAR))
         elif t == "content-type":
-            r.append(check_content_type(i))
+            r.append(get_content_type(i))
         elif t == "accept":
-            r.append(check_hdr_value(i, "accept", ACCPT))
+            r.append(get_hdr_value(i, "accept", ACCPT))
         elif t == "accept-language":
-            r.append(check_accept_language_value(i))
+            r.append(get_accept_language_value(i))
         elif t == "user-agent":
-            r.append(check_ua_value(i))
+            r.append(get_ua_value(i))
     ret = "/".join(r)
     return ret

@@ -2,7 +2,7 @@ import urllib.parse
 import os
 from math import log10
 from pathlib import Path
-from hfinger.configs.configs import METHODS
+from hfinger.configs import METHODS
 
 
 extensions = set()

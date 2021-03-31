@@ -1,108 +1,180 @@
-# Hfinger - fingerprinting HTTP requests
+# Hfinger - fingerprinting malware HTTP requests
 Tool for fingerprinting HTTP requests of malware. Based on Tshark and written in Python3. Working prototype stage :-)
 
-It's main objective is to provide a representation of malware requests in a shorter form than printing whole 
-request, but still human interpretable. This representation should be unique between malware families, 
-what means that any fingerprint should be seen only for one particular family.
+It's main objective is to provide unique representations (fingerprints) of malware requests, 
+which help in their identification. _Unique_ means here that each fingerprint should be seen only 
+in one particular malware family, yet one family can have multiple fingerprints. Hfinger
+represents the request in a shorter form than printing the whole request, but still human interpretable.
 
-An academic paper accompanies work on this tool, describing, for example, motivation of design choices. 
-It will be published here after peer-review process.
-## The idea
-Basic assumption of this project is that HTTP requests of different malware families are more or less unique, 
-so they can be fingerprinted to provide some sort of identification. Hfinger retains information about structure and 
+Hfinger can be used in manual malware analysis but also in sandbox systems or SIEMs. 
+The generated fingerprints are useful for grouping requests, pinpointing requests to particular malware families,
+identifying different operations of one family, 
+or discovering unknown malicious requests omitted by other security systems but which share fingerprint.
+
+An academic paper accompanies work on this tool, describing, for example, the motivation of design choices. 
+It will be published here after the peer-review process.
+
+## Table of contents
+1. [The idea](#idea)
+1. [Installation](#installation)
+1. [Usage](#usage)
+1. [Fingerprint creation](#fing-create)
+1. [Report modes](#report-modes)
+
+## The idea <a name="idea"></a>
+The basic assumption of this project is that HTTP requests of different malware families are more or less unique, 
+so they can be fingerprinted to provide some sort of identification. Hfinger retains information about the structure and 
 values of some headers to provide means for further analysis. 
-For example grouping of similar requests - at this moment it is still work in progress.
+For example, grouping of similar requests - at this moment, it is still a work in progress.
 
-After analysis of malware's HTTP requests and headers, some parts of requests were identified as being most distinctive. These include:
+After analysis of malware's HTTP requests and headers, we have identified some parts of requests as being most distinctive. 
+These include:
 * Request method
 * Protocol version
 * Header order
 * Popular headers' values
-* Payload length, entropy and presence of non-ASCII characters
+* Payload length, entropy, and presence of non-ASCII characters
 
-Additionally, some standard features of request URL were also considered. 
-All these parts were translated into set of features, described in details [here](./docs/feature_description.md).
+Additionally, some standard features of the request URL were also considered. 
+All these parts were translated into a set of features, described in details [here](./docs/feature_description.md).
 
 The above features are translated into varying length representation, which is the actual fingerprint. 
 Depending on report mode, different features are used to fingerprint requests. More information on these modes 
-is presented below. Feature selection process will be described in the upcoming academic paper.
+is presented below. The feature selection process will be described in the forthcoming academic paper.
 
-## Installation
-At this moment `hfinger` is distributed only via this repository. 
-`Tshark` required before installation - tested on Xubuntu 20.04 LTS with `tshark` package in version `3.2.3`.
+## Installation <a name="installation"></a>
+Minimum requirements needed before installation:
+* `Python` >= 3.3, 
+* `Tshark` >= 2.2.0.
 
-Please note, that as with any PoC, you should run it in a python virtual environment. Its setup is not covered here, 
+Installation available from PyPI:
+
+`pip install hfinger`
+
+Hfinger has been tested on Xubuntu 20.04 LTS with `tshark` package in version `3.2.3`, 
+but should work with version `2.6.10` on Ubuntu 18.04.
+
+Please note that as with any PoC, you should run Hfinger in a separated environment, 
+at least with Python virtual environment. Its setup is not covered here, 
 but you can try [this tutorial](https://docs.python.org/3/library/venv.html).
 
-`Hfinger` installation:
-1. Download repository.
-2. Unpack it to a chosen location.
-3. In terminal, change directory to the main catalogue of the unpacked repo.
-4. Enable `venv`
-5. Run `python3 setup.py install`
-6. `Hfinger` should be installed and ready to use.
+## Usage <a name="usage"></a>
+After installation, you can call the tool directly from a command line with `hfinger` 
+or as a Python module with `python -m hfinger`.
 
+For example:
 
-## Usage
-Calling the tool from a command line:
+```console
+foo@bar:~$ hfinger -f /tmp/test.pcap
+[{"epoch_time": "1614098832.205385000", "ip_src": "127.0.0.1", "ip_dst": "127.0.0.1", "port_src": "53664", "port_dst": "8080", "fingerprint": "2|3|1|php|0.6|PO|1|us-ag,ac,ac-en,ho,co,co-ty,co-le|us-ag:f452d7a9/ac:as-as/ac-en:id/co:Ke-Al/co-ty:te-pl|A|4|1.4"}]
 ```
-usage: hfinger.py [-h] (-f FILE | -d DIR) [-o output_path] [-m {0,1,2}]
 
-Hfinger - fingerprinting HTTP requests stored in pcap files
+Help is displayed with short `-h` or long `--help` switches:
+```
+usage: hfinger [-h] (-f FILE | -d DIR) [-o output_path] [-m {0,1,2,3,4}]
+
+Hfinger - fingerprinting malware HTTP requests stored in pcap files
 
 optional arguments:
   -h, --help            show this help message and exit
-  -f FILE, --file FILE  Read single pcap file
+  -f FILE, --file FILE  Read a single pcap file
   -d DIR, --directory DIR
-                        Read pcap files from directory DIR
+                        Read pcap files from the directory DIR
   -o output_path, --output-path output_path
                         Path to the output directory
-  -m {0,1,2}, --mode {0,1,2}
-                        Fingerprint report mode. 0 - optimal (default), 1 -
-                        informative, 2 - all features
+  -m {0,1,2,3,4}, --mode {0,1,2,3,4}
+                        Fingerprint report mode. 
+                        0 - similar number of collisions and fingerprints as mode 2, but using fewer features, 
+                        1 - representation of all designed features, but a little more collisions than modes 0, 2, and 4, 
+                        2 - optimal (the default mode), 
+                        3 - the lowest number of generated fingerprints, but the highest number of collisions, 
+                        4 - the highest fingerprint entropy, but slightly more fingerprints than modes 0-2
 
 ```
-You must provide path to a pcap file (-f) or directory (-d) with pcap files. The output is in JSON format.
-It will be printed to standard output or to provided directory (-o) using name of the source file. 
-For example output of the command:
+You must provide a path to a pcap file (-f), or a directory (-d) with pcap files. The output is in JSON format.
+It will be printed to standard output or to the provided directory (-o) using the name of the source file. 
+For example, output of the command:
 
-`python3 hfinger.py -f example.pcap -o /tmp/pcap`
+`hfinger -f example.pcap -o /tmp/pcap`
 
 will be saved to: 
 
 `/tmp/pcap/example.pcap.json`
 
-When any issues are encountered, for example finding unknown header, they are printed to standard error output, 
+Report mode `-m`/`--mode` can be used to change the default report mode by providing an integer in the range `0-4`. 
+The modes differ on represented request features or rounding modes. 
+The default mode (`2`) was chosen by us to represent all features that are usually used during requests' analysis, 
+but it also offers low number of collisions and generated fingerprints. 
+With other modes, you can achieve different goals. 
+For example, in mode `3` you get a lower number of generated fingerprints 
+but a higher chance of a collision between malware families. If you are unsure, you don't have to change anything.
+More information on report modes is [here](#report-modes).
+
+When any issues are encountered, for example, finding an unknown header, they are printed to standard error output, 
 so please monitor it.
 
-## Fingerprint creation
-An example of a `POST` request is presented below.
+### Using _hfinger_ in a Python application
+
+Beginning with version `0.2.0`, Hfinger supports importing to other Python applications. 
+To use it in your app simply import `hfinger_analyze` function from `hfinger.analysis` 
+and call it with a path to the pcap file and reporting mode. 
+The returned result is a list of dicts with fingerprinting results.
+
+For example:
+
+```python
+from hfinger.analysis import hfinger_analyze
+
+pcap_path = "SPECIFY_PCAP_PATH_HERE"
+reporting_mode = 4
+print(hfinger_analyze(pcap_path, reporting_mode))
 ```
-POST /dir1/dir2?var1=val1 HTTP/1.1
-Host: 127.0.0.1:8000
-Accept: */*
-User-Agent: My UA
-Content-Length: 9
-Content-Type: application/x-www-form-urlencoded
-
-misc=test
-```
-
-The fingerprint created by `hfinger` in the default report mode for this request is presented below. 
-Particular features of the fingerprint are separated using `|`. They are described below in the order of appearance in the fingerprint.
-![example](./docs/fingerprint_explanation.png)
 
 
-Firstly URL features are extracted: 
-* URL length represented as a logarithm base 10 of the length, 
-* extension of the requested file, but only if it is on a list of known extensions in `hfinger/configs/extensions.txt`
- (in the example it is empty as the request does not contain it), 
-* number of variables in the URL (in the example there as only one variable `var1`).
+## Fingerprint creation <a name="fing-create"></a>
+A fingerprint is based on features extracted from a request. 
+Usage of particular features from [the full list](./docs/feature_description.md) depends on the chosen 
+report mode from a predefined list (more information on report modes is [here](#report-modes)). 
+The figure below represents the creation of an exemplary fingerprint in the default report mode.
 
-Secondly header structure features are analyzed: 
+![example](./docs/fingerprint_generation.png)
+
+Three parts of the request are analyzed to extract information: URI, 
+headers' structure (including method and protocol version), and payload. 
+Particular features of the fingerprint are separated using `|` (pipe). The final fingerprint generated for the `POST`
+request from the example is:
+
+`2|3|1|php|0.6|PO|1|us-ag,ac,ac-en,ho,co,co-ty,co-le|us-ag:f452d7a9/ac:as-as/ac-en:id/co:Ke-Al/co-ty:te-pl|A|4|1.4`
+
+The creation of features is described below in the order of appearance in the fingerprint.
+
+Firstly, URI features are extracted: 
+* URI length represented as a logarithm base 10 of the length, rounded to an integer, 
+  (in the example URI is 43 characters long, so `log10(43)≈2`),
+* number of directories, (in the example there are 3 directories),
+* average directory length, represented as a logarithm with base 10 of the actual 
+  average length of the directory, rounded to an integer,
+  (in the example there are three directories with total length of 20 characters (6+6+8), so `log10(20/3)≈1`),
+* extension of the requested file, but only if it is on a list of known extensions in `hfinger/configs/extensions.txt`, 
+* average value length represented as a logarithm with base 10 of the actual average value length, 
+  rounded to one decimal point, (in the example two values have the same length of 4 characters, 
+  what is obviously equal to 4 characters, and `log10(4)≈0.6`).
+
+Secondly, header structure features are analyzed: 
 * request method encoded as first two letters of the method (`PO`), 
-* protocol version encoded as an integer (_1_ for version _1.1_, _0_ for version _1.0_, and _9_ for version _0.9_), 
-* and popular headers and their values, 
+* protocol version encoded as an integer (_1_ for version _1.1_, _0_ for version _1.0_, and _9_ for version _0.9_),
+* order of the headers,
+* and popular headers and their values. 
+
+To represent order of the headers in the request, each header's name is encoded according to the schema in 
+`hfinger/configs/headerslow.json`, for example, `User-Agent` header is encoded as `us-ag`. 
+Encoded names are separated by `,`. If the header name does not start with an upper case letter
+(or any of its parts when analyzing compound headers such as `Accept-Encoding`), 
+then encoded representation is prefixed with `!`. 
+If the header name is not on the list of the known headers, 
+it is hashed using [FNV1a hash](https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function), 
+and the hash is used as encoding. 
+
 
 When analyzing popular headers, the request is checked if they appear in it. These headers are:
 * Connection
@@ -116,81 +188,105 @@ When analyzing popular headers, the request is checked if they appear in it. The
 * Accept-Language
 * User-Agent
 
-When header is found in the request, its value is checked against table of 
-typical values to create pairs of `header_name_representation:value_representation`. The name of the header is encoded according to 
-`hfinger/configs/headerslow.json` and value is encoded according to tables stored in `hfinger/configs` directory. In the above example
-`Accept` is encoded as `ac` and its value `*/*` as `as-as` (`asterisk-asterisk`), giving `ac:as-as`. 
+When the header is found in the request, its value is checked against a table of 
+typical values to create pairs of `header_name_representation:value_representation`. 
+The name of the header is encoded according to the schema in `hfinger/configs/headerslow.json` (as presented before),
+and the value is encoded according to schema stored in `hfinger/configs` directory or `configs.py` file, 
+depending on the header. In the above example `Accept` is encoded as `ac` 
+and its value `*/*` as `as-as` (`asterisk-asterisk`), giving `ac:as-as`. 
 The pairs are inserted into fingerprint in order of appearance in the request and are delimited using `/`. 
-If the header value cannot be found in in the encoding table it is hashed using 
-[FNV1a hash](https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function).  
-Also if it is composed of multiple values, they are tokenized to provide list of values delimited with `,`, 
-for example `Accept: */*, text/*` would give `ac:as-as,te-as`. However, at this point of development, if the header 
-value contain "quality value" tag (`q=`), then the whole value is hashed with FNV.
-Finally values of *User-Agent* and *Accept-Language* headers are directly hashed using FNV. 
+If the header value cannot be found in the encoding table, it is hashed using the FNV1a hash.  
+If the header value is composed of multiple values, they are tokenized to provide a list of values delimited with `,`, 
+for example, `Accept: */*, text/*` would give `ac:as-as,te-as`. However, at this point of development, if the header 
+value contains a "quality value" tag (`q=`), then the whole value is encoded with its FNV1a hash.
+Finally, values of *User-Agent* and *Accept-Language* headers are directly encoded using their FNV1a hashes. 
 
-Some of the `hfinger` report modes provide a list of headers in order of appearance in the request. 
-The list is created using similar method as described above. The header names are encoded using 
-`hfinger/configs/headerslow.json` and separated with `,`. If the header name does not start with upper case letter
-(or any of its parts when analyzing compound headers such as `Accept-Encoding`), 
-then encoded representation is prefixed with `!`. If the header name is not on the list of known headers it is hashed using FNV. 
+Finally, in the payload features:
+* presence of non-ASCII characters, represented with the letter `N`, and with `A` otherwise,
+* payload's Shannon entropy, rounded to an integer,
+* and payload length, represented as a logarithm with base 10 of the actual payload length, 
+  rounded to one decimal point.
 
+## Report modes <a name="report-modes"></a>
 
-Finally, in the payload features, length of the payload is represented as a base 10 logarithm of the actual payload length rounded to an integer.
-
-Please note that the above description of fingerprint creation covers the default feature set. 
-`Hfinger` is equipped with other feature sets, which can be chosen depending on the required amount of information. 
-They are available via report modes switch.
-
-## Report modes
-
-`Hfinger` operates in three fingerprint report modes, which differ in information extracted from requests:
-* optimal,
-* informative,
-* all features.
-
-The modes were chosen in order to optimize `hfinger` capabilities to uniquely identify malware families
-versus its capability to generalize information about the requests. Description of features is provided 
-[here](./docs/feature_description.md). The `all features` mode provide the most unique fingerprints, 
-however it produces bigger number of fingerprints than other two modes. 
-The `optimal` mode provides slightly less unique fingerprints, but also significantly reduces the number of fingerprints.
-The `informative` mode is similar to `optimal` regarding uniqueness, however it produces more fingerprints 
-for the price of giving more information about URL, headers and payload.
-
-The modes consists of feature sets:
-* optimal (the default - option _0_):
-  * URL length represented as a base 10 logarithm of the actual length, 
-  * extension of the requested file, 
-  * number of variables in the URL,
-  * request method, 
-  * protocol version, 
-  * popular headers and their values, 
-  * payload length represented a base 10 logarithm of the actual length rounded to integer,
-* informative (option _1_): 
-  * URL length represented as a base 10 logarithm of the actual length, 
-  * number of directories in the URL, 
-  * extension of the requested file, 
-  * number of variables in the URL, 
-  * request method, 
-  * protocol version, 
-  * order of headers, 
-  * popular headers and their values, 
-  * payload length represented a base 10 logarithm of the actual length rounded to integer, 
-  * and payload entropy represented as an integer,
-* all features (option _2_): 
-  * URL length represented as a base 10 logarithm of the actual length, 
-  * number of directories in the URL, 
-  * average length of directory in the URL, represented as a base 10 logarithm of actual average length, 
-  * extension of the requested file, 
-  * length of the variable part of the URL, represented as a base 10 logarithm of the length and rounded to an integer, 
-  * number of variables in the URL, 
-  * average value length, represented as base 10 logarithm of the actual average value length rounded to an integer, 
-  * request method, 
-  * protocol version, 
-  * order of headers, 
-  * popular headers and their values, 
-  * presence of non-ASCII characters (with "N" when such characters are present and "A" when they are not),
-  * payload length represented a base 10 logarithm of the actual length, 
-  * payload entropy.
+`Hfinger` operates in five report modes, which differ in features represented in the fingerprint, thus 
+information extracted from requests. These are (with the number used in the tool configuration):
+* mode `0` - producing a similar number of collisions and fingerprints as mode `2`, but using fewer features,
+* mode `1` - representing all designed features, but producing a little more collisions than modes `0`, `2`, and `4`,
+* mode `2` - optimal (the default mode), representing all features which are usually used during requests' analysis, 
+  but also offering a low number of collisions and generated fingerprints,
+* mode `3` - producing the lowest number of generated fingerprints from all modes, 
+  but achieving the highest number of collisions,
+* mode `4` - offering the highest fingerprint entropy, 
+  but also generating slightly more fingerprints than modes `0`-`2`.
 
 
-![Co-financed by the Connecting Europe Facility by of the European Union](https://www.cert.pl/wp-content/uploads/2019/02/en_horizontal_cef_logo-1.png)
+The modes were chosen in order to optimize Hfinger's capabilities to uniquely identify malware families
+versus the number of generated fingerprints. Modes `0`, `2`, and `4` offer a similar number of collisions 
+between malware families, however, mode `4` generates a little more fingerprints than the other two. 
+Mode `2` represents more request features than mode `0` with a comparable number of generated fingerprints and collisions.
+Mode `1` is the only one representing all designed features, but it increases the number of collisions by almost two times 
+comparing to modes `0`, `1`, and `4`. Mode `3` produces at least two times fewer fingerprints than other modes, but it 
+introduces about nine times more collisions. Description of all designed features is [here](./docs/feature_description.md).
+
+The modes consist of features (in the order of appearance in the fingerprint):
+* mode `0`:
+  * number of directories,
+  * average directory length represented as an integer,
+  * extension of the requested file,
+  * average value length represented as a float,
+  * order of headers,
+  * popular headers and their values,
+  * payload length represented as a float.
+* mode `1`:
+  * URI length represented as an integer,
+  * number of directories,
+  * average directory length represented as an integer,
+  * extension of the requested file,
+  * variable length represented as an integer,
+  * number of variables,
+  * average value length represented as an integer,
+  * request method,
+  * version of protocol,
+  * order of headers,
+  * popular headers and their values,
+  * presence of non-ASCII characters,
+  * payload entropy represented as an integer,
+  * payload length represented as an integer.
+* mode `2`:
+  * URI length represented as an integer,
+  * number of directories,
+  * average directory length represented as an integer,
+  * extension of the requested file,
+  * average value length represented as a float,
+  * request method,
+  * version of protocol,
+  * order of headers,
+  * popular headers and their values,
+  * presence of non-ASCII characters,
+  * payload entropy represented as an integer,
+  * payload length represented as a float.
+* mode `3`:
+  * URI length represented as an integer,
+  * average directory length represented as an integer,
+  * extension of the requested file,
+  * average value length represented as an integer,
+  * order of headers.
+* mode `4`:
+  * URI length represented as a float,
+  * number of directories,
+  * average directory length represented as a float,
+  * extension of the requested file,
+  * variable length represented as a float,
+  * average value length represented as a float,
+  * request method,
+  * version of protocol,
+  * order of headers,
+  * popular headers and their values,
+  * presence of non-ASCII characters,
+  * payload entropy represented as a float,
+  * payload length represented as a float.
+
+
+
+![Co-financed by the Connecting Europe Facility by of the European Union](./docs/en_horizontal_cef_logo_2.png)

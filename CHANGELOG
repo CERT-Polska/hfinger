@@ -1,0 +1,15 @@
+Changes in version 0.2.0
+- changes in report modes:
+    - 5 new fingerprint generation modes
+    - changes are **incompatible** with previous version 0.1.0
+    - caused by improved analysis of the tool performed for the forthcoming academic paper
+- Hfinger now supports installation through pip
+- added support for importing from Python scripts
+- package is restructured
+    - no subpackages
+    - incorporating some of the changes proposed by https://github.com/ventaquil
+- extending exception support
+- fixed problems with computation of some features
+- README fixes
+
+Initial version: 0.1.0

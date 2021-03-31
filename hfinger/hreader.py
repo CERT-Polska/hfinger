@@ -1,9 +1,7 @@
 import json
 import sys
-import hfinger.hfinger_core
-from math import log10
-import hfinger.uri_reader
-from hfinger.configs.configs import FEATURESET
+from hfinger.configs import FEATURESET
+from hfinger import hfinger_core, uri_reader
 
 
 def compute_finger_raw(tcp_raw, iscrlf):
@@ -12,10 +10,10 @@ def compute_finger_raw(tcp_raw, iscrlf):
         pkt = bytes.fromhex(tcp_raw).split(b"\r\n\r\n")[0].decode("ascii").split("\r\n")
     else:
         pkt = bytes.fromhex(tcp_raw).split(b"\n\n")[0].decode("ascii").split("\n")
-    uri_fing = hfinger.uri_reader.uri_fingerprint(pkt)
-    method = hfinger.hfinger_core.check_method_version(pkt)
-    hdr = hfinger.hfinger_core.check_hdr_order(pkt)
-    val2 = hfinger.hfinger_core.check_pop_hdr_val2(pkt)
+    uri_fing = uri_reader.uri_fingerprint(pkt)
+    method = hfinger_core.get_method_version(pkt)
+    hdr = hfinger_core.get_hdr_order(pkt)
+    val2 = hfinger_core.get_pop_hdr_val(pkt)
     return f"{uri_fing}|{method}|{hdr}|{val2}"
 
 
@@ -47,8 +45,8 @@ def analyze_request_give_fingerprint(tmp, crlftagpresent):
         tag_len = 4
     finger_raw = compute_finger_raw(tmp, crlftagpresent)
     ind1 = tmp.find(delim)
-    if len(tmp[ind1 + tag_len:]) > 0:
-        payload_raw = tmp[ind1 + tag_len:]
+    if len(tmp[ind1 + tag_len :]) > 0:
+        payload_raw = tmp[ind1 + tag_len :]
     if payload_raw != "":
         try:
             payload_ascii = bytes.fromhex(payload_raw).decode("ascii")
@@ -61,9 +59,10 @@ def analyze_request_give_fingerprint(tmp, crlftagpresent):
             )
         else:
             finger_pay += "A|"
-        finger_pay += hfinger.hfinger_core.check_entropy(payload_raw)
+        payload_bytes = bytes.fromhex(payload_raw)
+        finger_pay += hfinger_core.get_entropy(payload_bytes)
         finger_pay += "|"
-        finger_pay += str(round(log10(len(payload_raw)), 1))
+        finger_pay += hfinger_core.get_length(payload_bytes)
     return finger_raw, finger_pay
 
 
@@ -129,7 +128,9 @@ def reader(data, report_mode, tsharkold):
                         "No CRLFCRLF in request when parsing using frame_raw - switching to LFLF",
                         file=sys.stderr,
                     )
-                    finger_raw, finger_pay = analyze_request_give_fingerprint(tmp, False)
+                    finger_raw, finger_pay = analyze_request_give_fingerprint(
+                        tmp, False
+                    )
                 else:
                     # Unusual situation, extracting request from http_raw layer - not always dependable layer
                     print(

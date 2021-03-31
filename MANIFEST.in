@@ -1,0 +1,2 @@
+include hfinger/configs/*.json
+include hfinger/configs/*.txt
