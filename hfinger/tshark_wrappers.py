@@ -2,7 +2,7 @@ import subprocess
 from distutils.version import LooseVersion
 
 
-def check_tshark_version():
+def get_tshark_version():
     version_raw = subprocess.check_output(["tshark", "-v"]).decode("ascii")
     for lin in version_raw.splitlines():
         if "TShark (Wireshark)" in lin:
