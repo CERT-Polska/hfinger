@@ -1,7 +1,7 @@
 # Hfinger - fingerprinting malware HTTP requests
 Tool for fingerprinting HTTP requests of malware. Based on Tshark and written in Python3. Working prototype stage :-)
 
-It's main objective is to provide unique representations (fingerprints) of malware requests, 
+Its main objective is to provide unique representations (fingerprints) of malware requests, 
 which help in their identification. _Unique_ means here that each fingerprint should be seen only 
 in one particular malware family, yet one family can have multiple fingerprints. Hfinger
 represents the request in a shorter form than printing the whole request, but still human interpretable.
@@ -15,13 +15,13 @@ An academic paper accompanies work on this tool, describing, for example, the mo
 It will be published here after the peer-review process.
 
 ## Table of contents
-1. [The idea](#idea)
+1. [The idea](#the-idea)
 1. [Installation](#installation)
 1. [Usage](#usage)
-1. [Fingerprint creation](#fing-create)
+1. [Fingerprint creation](#fingerprint-creation)
 1. [Report modes](#report-modes)
 
-## The idea <a name="idea"></a>
+## The idea
 The basic assumption of this project is that HTTP requests of different malware families are more or less unique, 
 so they can be fingerprinted to provide some sort of identification. Hfinger retains information about the structure and 
 values of some headers to provide means for further analysis. 
@@ -42,7 +42,7 @@ The above features are translated into varying length representation, which is t
 Depending on report mode, different features are used to fingerprint requests. More information on these modes 
 is presented below. The feature selection process will be described in the forthcoming academic paper.
 
-## Installation <a name="installation"></a>
+## Installation
 Minimum requirements needed before installation:
 * `Python` >= 3.3, 
 * `Tshark` >= 2.2.0.
@@ -58,7 +58,7 @@ Please note that as with any PoC, you should run Hfinger in a separated environm
 at least with Python virtual environment. Its setup is not covered here, 
 but you can try [this tutorial](https://docs.python.org/3/library/venv.html).
 
-## Usage <a name="usage"></a>
+## Usage
 After installation, you can call the tool directly from a command line with `hfinger` 
 or as a Python module with `python -m hfinger`.
 
@@ -69,7 +69,7 @@ foo@bar:~$ hfinger -f /tmp/test.pcap
 [{"epoch_time": "1614098832.205385000", "ip_src": "127.0.0.1", "ip_dst": "127.0.0.1", "port_src": "53664", "port_dst": "8080", "fingerprint": "2|3|1|php|0.6|PO|1|us-ag,ac,ac-en,ho,co,co-ty,co-le|us-ag:f452d7a9/ac:as-as/ac-en:id/co:Ke-Al/co-ty:te-pl|A|4|1.4"}]
 ```
 
-Help is displayed with short `-h` or long `--help` switches:
+Help can be displayed with short `-h` or long `--help` switches:
 ```
 usage: hfinger [-h] (-f FILE | -d DIR) [-o output_path] [-m {0,1,2,3,4}]
 
@@ -131,7 +131,7 @@ print(hfinger_analyze(pcap_path, reporting_mode))
 ```
 
 
-## Fingerprint creation <a name="fing-create"></a>
+## Fingerprint creation
 A fingerprint is based on features extracted from a request. 
 Usage of particular features from [the full list](./docs/feature_description.md) depends on the chosen 
 report mode from a predefined list (more information on report modes is [here](#report-modes)). 
@@ -207,7 +207,7 @@ Finally, in the payload features:
 * and payload length, represented as a logarithm with base 10 of the actual payload length, 
   rounded to one decimal point.
 
-## Report modes <a name="report-modes"></a>
+## Report modes
 
 `Hfinger` operates in five report modes, which differ in features represented in the fingerprint, thus 
 information extracted from requests. These are (with the number used in the tool configuration):

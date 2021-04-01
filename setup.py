@@ -19,7 +19,6 @@ setup(
     author="Piotr Bialczak",
     author_email="piotrb@cert.pl",
     packages=["hfinger"],
-    license="GPLv3",
     url="https://github.com/CERT-Polska/hfinger",
     include_package_data=True,
     install_requires=open("requirements.txt").read().splitlines(),
