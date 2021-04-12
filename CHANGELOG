@@ -1,3 +1,9 @@
+Changes in version 0.2.1
+- fixed problems with analysis of non-ASCII characters present in request headers or URI
+- Hfinger is less verbose and added logfile support
+- some code fixes for non RFC compliant requests
+- minor fixes and code extensions
+
 Changes in version 0.2.0
 - changes in report modes:
     - 5 new fingerprint generation modes

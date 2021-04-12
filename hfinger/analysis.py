@@ -6,6 +6,7 @@ import argparse
 import magic
 import subprocess
 import json
+import logging
 
 from hfinger import hreader, tshark_wrappers
 from .hfinger_exceptions import (
@@ -103,7 +104,24 @@ def commandline_run():
         "\n3 - the lowest number of generated fingerprints, but the highest number of collisions, "
         "\n4 - the highest fingerprint entropy, but slightly more fingerprints than modes 0-2",
     )
+    my_parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Report information about non-standard values in the request "
+             "(e.g., non-ASCII characters, no CRLF tags, values not present in the configuration list). "
+             "Without --logfile (-l) will print to the standard error.",
+    )
+    my_parser.add_argument(
+        "-l",
+        "--logfile",
+        action="store",
+        type=str,
+        help="Output logfile in the verbose mode. Requires -v or --verbose switch.",
+    )
     args = my_parser.parse_args()
+    if args.logfile and args.verbose is False:
+        my_parser.error("The --logfile (-l) option requires --verbose (-v).")
     tshark_exec = ""
     tshark_ver = ""
     try:
@@ -111,6 +129,12 @@ def commandline_run():
     except (PythonTooOld, TsharkNotFound, TsharkTooOld) as err:
         print(err)
         sys.exit(1)
+    if args.verbose:
+        logging.getLogger("hfinger").setLevel(logging.INFO)
+    if args.logfile:
+        logging.getLogger("hfinger").addHandler(logging.FileHandler(args.logfile, encoding="utf-8"))
+    else:
+        logging.getLogger("hfinger").addHandler(logging.StreamHandler())
     if args.file:
         try:
             is_pcap_file(args.file)
@@ -146,6 +170,7 @@ def commandline_run():
                 continue
             else:
                 no_pcaps_found_flag = False
+                logging.getLogger("hfinger").info("Analyzing file: " + str(cur_file))
                 results = run_tshark(cur_file, args.mode, tshark_exec, tshark_ver)
                 if args.output_path is not None:
                     write_results_to_file(cur_file, args.output_path, results)
@@ -155,14 +180,23 @@ def commandline_run():
             print("No valid pcap files found in the directory")
 
 
-def hfinger_analyze(pcap, reportmode=2):
+def hfinger_analyze(pcap, reportmode=2, verbose=False):
     """
     Returns the results of fingerprinting for single pcap file.
     Intended to be called from python scripts as the main function of the tool.
 
+
             Parameters:
-                    pcap (str): Path to pcap file.
-                    reportmode (int): Reporting mode of Hfinger in range 0-4. Default value is '2'.
+                    pcap (str): Path to the pcap file.
+                    reportmode (int): Reporting mode of Hfinger in range 0-4. The default value is '2'.
+                    verbose (bool): Boolean flag used to control the verbosity level. Hfinger logs information about
+                                    encountering non-standard values in the headers or some minor problems when decoding
+                                    data. The logging is done using 'logging' module and INFO logging level.
+                                    If the variable is left unchanged, in practice no logs will be saved
+                                    (the log information is forwarded to a NullHandler).
+                                    If the variable is set to True, the function assumes that 'hfinger'
+                                    logger has been properly created and configured, including setting log level
+                                    to INFO. Otherwise no information will be printed.
 
             Returns:
                     results (list): Python list of dicts with fingerprinting results.
@@ -178,5 +212,8 @@ def hfinger_analyze(pcap, reportmode=2):
         raise BadReportmodeVariable("Wrong type, should be 'int'.")
     if reportmode not in range(0, 5):
         raise BadReportmodeVariable("Wrong value, should be in range 0-4.")
+    if verbose is False:
+        logging.getLogger("hfinger").addHandler(logging.NullHandler())
+
     results = run_tshark(pcap, reportmode, tshark_exec, tshark_ver)
     return results

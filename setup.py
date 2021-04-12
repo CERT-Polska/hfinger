@@ -14,9 +14,9 @@ Project's website: [https://github.com/CERT-Polska/hfinger](https://github.com/C
 
 setup(
     name="hfinger",
-    version="0.2.0",
+    version="0.2.1",
     description="Hfinger - fingerprinting malware HTTP requests stored in pcap files",
-    author="Piotr Bialczak",
+    author="Piotr Białczak",
     author_email="piotrb@cert.pl",
     packages=["hfinger"],
     url="https://github.com/CERT-Polska/hfinger",

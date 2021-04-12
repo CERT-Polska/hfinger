@@ -5,6 +5,10 @@ import math
 from pathlib import Path
 from hfinger.configs import AEVAL, CONNVAL, CONTENC, CACHECONT, TE, ACCPTCHAR, METHODS
 import sys
+import logging
+
+
+logger = logging.getLogger("hfinger")
 
 
 def read_config(filename):
@@ -127,7 +131,7 @@ def get_hdr_value(hdr, hdrname, hdr_value_table):
             if j == "":
                 return hdr_coded + format(fnv1a_32(val.encode()), "x")
             if j not in hdr_value_table:
-                print("Unknown header value - " + hdr, file=sys.stderr)
+                logger.info("Unknown header value - " + hdr)
                 return hdr_coded + format(fnv1a_32(val.encode()), "x")
             ret.append(hdr_value_table[j])
     else:
@@ -135,7 +139,7 @@ def get_hdr_value(hdr, hdrname, hdr_value_table):
         if val in hdr_value_table:
             k = hdr_value_table[val]
         else:
-            print("Unknown header value - " + hdr, file=sys.stderr)
+            logger.info("Unknown header value - " + hdr)
             k = format(fnv1a_32(val.encode()), "x")
         ret.append(k)
     return hdr_coded + ",".join(ret)
@@ -165,7 +169,7 @@ def get_content_type(hdr):
             else:
                 k = format(fnv1a_32(itv.encode()), "x")
                 if itv not in CONTENTTYPE:
-                    print("Unknown Content-Type value - " + hdr, file=sys.stderr)
+                    logger.info("Unknown Content-Type value - " + hdr)
                 else:
                     k = CONTENTTYPE[itv]
                 ret.append(k)
@@ -180,7 +184,7 @@ def get_content_type(hdr):
         else:
             k = format(fnv1a_32(val.encode()), "x")
             if val not in CONTENTTYPE:
-                print("Unknown Content-Type value - " + hdr, file=sys.stderr)
+                logger.info("Unknown Content-Type value - " + hdr)
             else:
                 k = CONTENTTYPE[val]
             ret.append(k)
@@ -197,26 +201,29 @@ def get_accept_language_value(hdr):
 def get_pop_hdr_val(pkt):
     r = []
     for i in pkt[1:]:
-        t = i.split(":")[0].lower()
-        if t == "connection":
-            r.append(get_hdr_value(i, "connection", CONNVAL))
-        elif t == "accept-encoding":
-            r.append(get_hdr_value(i, "accept-encoding", AEVAL))
-        elif t == "content-encoding":
-            r.append(get_hdr_value(i, "content-encoding", CONTENC))
-        elif t == "cache-control":
-            r.append(get_hdr_value(i, "cache-control", CACHECONT))
-        elif t == "te":
-            r.append(get_hdr_value(i, "te", TE))
-        elif t == "accept-charset":
-            r.append(get_hdr_value(i, "accept-charset", ACCPTCHAR))
-        elif t == "content-type":
-            r.append(get_content_type(i))
-        elif t == "accept":
-            r.append(get_hdr_value(i, "accept", ACCPT))
-        elif t == "accept-language":
-            r.append(get_accept_language_value(i))
-        elif t == "user-agent":
-            r.append(get_ua_value(i))
+        if ":" in i:
+            t = i.split(":")[0].lower()
+            if t == "connection":
+                r.append(get_hdr_value(i, "connection", CONNVAL))
+            elif t == "accept-encoding":
+                r.append(get_hdr_value(i, "accept-encoding", AEVAL))
+            elif t == "content-encoding":
+                r.append(get_hdr_value(i, "content-encoding", CONTENC))
+            elif t == "cache-control":
+                r.append(get_hdr_value(i, "cache-control", CACHECONT))
+            elif t == "te":
+                r.append(get_hdr_value(i, "te", TE))
+            elif t == "accept-charset":
+                r.append(get_hdr_value(i, "accept-charset", ACCPTCHAR))
+            elif t == "content-type":
+                r.append(get_content_type(i))
+            elif t == "accept":
+                r.append(get_hdr_value(i, "accept", ACCPT))
+            elif t == "accept-language":
+                r.append(get_accept_language_value(i))
+            elif t == "user-agent":
+                r.append(get_ua_value(i))
+        else:
+            logger.info("No colon in line: " + i)
     ret = "/".join(r)
     return ret
