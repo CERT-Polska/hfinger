@@ -25,7 +25,12 @@ def compute_finger_raw(tcp_raw, iscrlf):
         pkt = bytes.fromhex(tcp_raw).split(delim)[0].decode("ascii").split(nline)
     except UnicodeDecodeError:
         logger.info("Non-ASCII characters found in the request (non-payload part)")
-        pkt = bytes.fromhex(tcp_raw).split(delim)[0].decode("ascii", errors="backslashreplace").split(nline)
+        pkt = (
+            bytes.fromhex(tcp_raw)
+            .split(delim)[0]
+            .decode("ascii", errors="backslashreplace")
+            .split(nline)
+        )
     uri_fing = uri_reader.uri_fingerprint(pkt)
     method = hfinger_core.get_method_version(pkt)
     hdr = hfinger_core.get_hdr_order(pkt)
@@ -130,13 +135,17 @@ def reader(data, report_mode, tsharkold):
                 if "0d0a0d0a" in tmp:
                     finger_raw, finger_pay = analyze_request_give_fingerprint(tmp, True)
                 elif "0a0a" in tmp:
-                    logger.info("No CRLFCRLF in request when parsing using frame_raw - switching to LFLF")
+                    logger.info(
+                        "No CRLFCRLF in request when parsing using frame_raw - switching to LFLF"
+                    )
                     finger_raw, finger_pay = analyze_request_give_fingerprint(
                         tmp, False
                     )
                 else:
                     # Unusual situation, extracting request from http_raw layer - not always dependable layer
-                    logger.info("Some other problem when parsing new line tags - going back to http_raw")
+                    logger.info(
+                        "Some other problem when parsing new line tags - going back to http_raw"
+                    )
                     tmp = p["_source"]["layers"]["http_raw"]
                     finger_raw, finger_pay = give_fingerprint(tmp)
         json_dict["epoch_time"] = p["_source"]["layers"]["frame"]["frame.time_epoch"]

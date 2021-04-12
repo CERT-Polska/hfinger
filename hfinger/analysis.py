@@ -109,8 +109,8 @@ def commandline_run():
         "--verbose",
         action="store_true",
         help="Report information about non-standard values in the request "
-             "(e.g., non-ASCII characters, no CRLF tags, values not present in the configuration list). "
-             "Without --logfile (-l) will print to the standard error.",
+        "\n(e.g., non-ASCII characters, no CRLF tags, values not present in the configuration list). "
+        "\nWithout --logfile (-l) will print to the standard error.",
     )
     my_parser.add_argument(
         "-l",
@@ -132,7 +132,9 @@ def commandline_run():
     if args.verbose:
         logging.getLogger("hfinger").setLevel(logging.INFO)
     if args.logfile:
-        logging.getLogger("hfinger").addHandler(logging.FileHandler(args.logfile, encoding="utf-8"))
+        logging.getLogger("hfinger").addHandler(
+            logging.FileHandler(args.logfile, encoding="utf-8")
+        )
     else:
         logging.getLogger("hfinger").addHandler(logging.StreamHandler())
     if args.file:
