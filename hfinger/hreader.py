@@ -66,8 +66,8 @@ def analyze_request_give_fingerprint(tmp, crlftagpresent):
         tag_len = 4
     finger_raw = compute_finger_raw(tmp, crlftagpresent)
     ind1 = tmp.find(delim)
-    if len(tmp[ind1 + tag_len:]) > 0:
-        payload_raw = tmp[ind1 + tag_len:]
+    if len(tmp[ind1 + tag_len :]) > 0:
+        payload_raw = tmp[ind1 + tag_len :]
     if payload_raw != "":
         try:
             payload_ascii = bytes.fromhex(payload_raw).decode("ascii")

@@ -109,7 +109,7 @@ def uri_fingerprint(pkt):
         # searching for URL, which should be separated from method with whitespace
         it1 = t.find(" ")
         # cutting out URL
-        uri = t[it1 + 1:]
+        uri = t[it1 + 1 :]
         return give_fing(uri)
     else:
         return "|||||||"
