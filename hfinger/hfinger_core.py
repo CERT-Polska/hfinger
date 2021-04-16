@@ -47,14 +47,14 @@ def get_hdr_case(hdr):
 
 
 # Checking method and proto version
-def get_method_version(request_splitted):
+def get_method_version(request_split):
     r_ver = ""
     r_meth = ""
     # Checking if HTTP version is provided, if not assuming it is HTTP 0.9 per www.w3.org/Protocols/HTTP/Request.html
-    if " HTTP/" not in request_splitted[0]:
+    if " HTTP/" not in request_split[0]:
         r_ver = "9"
         # take first seven characters of the first line of request to look for method (methods have up to 7 chars)
-        t2 = request_splitted[0][:7].upper().strip(" ")
+        t2 = request_split[0][:7].upper().strip(" ")
         # if method shorter than 7 chars we will have part of URL in t2
         # we should find space between method and URL and cut the string on it
         it = t2.find(" ")
@@ -65,7 +65,7 @@ def get_method_version(request_splitted):
         if meth in METHODS:
             r_meth = meth[:2]
     else:
-        t = request_splitted[0].split(" HTTP/")
+        t = request_split[0].split(" HTTP/")
         t1 = t[0].lstrip(" ")
         # check if method is present by taking first 7 characters and searching there for method
         # (methods have up to 7 chars)
@@ -87,9 +87,9 @@ def get_method_version(request_splitted):
 
 
 # Checking header order - assuming that header field contains ":"
-def get_hdr_order(request_splitted):
+def get_hdr_order(request_split):
     ret = []
-    for reqline in request_splitted[1:]:
+    for reqline in request_split[1:]:
         hdr = reqline.split(":")[0]
         hdr_lower = hdr.lower()
         hdr_coded = format(fnv1a_32(hdr.encode()), "x")
@@ -198,9 +198,9 @@ def get_accept_language_value(hdr):
     return ret
 
 
-def get_pop_hdr_val(request_splitted):
+def get_pop_hdr_val(request_split):
     r = []
-    for reqline in request_splitted[1:]:
+    for reqline in request_split[1:]:
         if ":" in reqline:
             hdr_lower = reqline.split(":")[0].lower()
             if hdr_lower == "connection":
