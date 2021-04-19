@@ -71,7 +71,8 @@ foo@bar:~$ hfinger -f /tmp/test.pcap
 
 Help can be displayed with short `-h` or long `--help` switches:
 ```
-usage: hfinger [-h] (-f FILE | -d DIR) [-o output_path] [-m {0,1,2,3,4}]
+usage: hfinger [-h] (-f FILE | -d DIR) [-o output_path] [-m {0,1,2,3,4}] [-v]
+               [-l LOGFILE]
 
 Hfinger - fingerprinting malware HTTP requests stored in pcap files
 
@@ -89,6 +90,11 @@ optional arguments:
                         2 - optimal (the default mode), 
                         3 - the lowest number of generated fingerprints, but the highest number of collisions, 
                         4 - the highest fingerprint entropy, but slightly more fingerprints than modes 0-2
+  -v, --verbose         Report information about non-standard values in the request 
+                        (e.g., non-ASCII characters, no CRLF tags, values not present in the configuration list). 
+                        Without --logfile (-l) will print to the standard error.
+  -l LOGFILE, --logfile LOGFILE
+                        Output logfile in the verbose mode. Implies -v or --verbose switch.
 
 ```
 You must provide a path to a pcap file (-f), or a directory (-d) with pcap files. The output is in JSON format.
@@ -110,8 +116,12 @@ For example, in mode `3` you get a lower number of generated fingerprints
 but a higher chance of a collision between malware families. If you are unsure, you don't have to change anything.
 More information on report modes is [here](#report-modes).
 
-When any issues are encountered, for example, finding an unknown header, they are printed to standard error output, 
-so please monitor it.
+Beginning with version `0.2.1` Hfinger is less verbose. You should use `-v`/`--verbose` if you want to receive 
+information about encountered non-standard values of headers, non-ASCII characters in the non-payload part of 
+the request, lack of CRLF tags (`\r\n\r\n`), and other problems with analyzed requests that are not application errors.
+When any such issues are encountered in the verbose mode, they will be printed to the standard error output. 
+You can also save the log to a defined location using `-l`/`--log` switch (it implies `-v`/`--verbose`). 
+The log data will be appended to the log file.
 
 ### Using _hfinger_ in a Python application
 
@@ -130,6 +140,13 @@ reporting_mode = 4
 print(hfinger_analyze(pcap_path, reporting_mode))
 ```
 
+Beginning with version `0.2.1` Hfinger uses `logging` module for logging information about encountered 
+non-standard values of headers, non-ASCII characters in the non-payload part of the request, 
+lack of CRLF tags (`\r\n\r\n`), and other problems with analyzed requests that are not application errors. 
+Hfinger creates its own logger using name `hfinger`, but without prior configuration log information in practice is discarded.
+If you want to receive this log information, before calling `hfinger_analyze`, you should configure `hfinger` logger, 
+set log level to `logging.INFO`, configure log handler up to your needs, add it to the logger.
+More information is available in the `hfinger_analyze` function docstring.
 
 ## Fingerprint creation
 A fingerprint is based on features extracted from a request. 

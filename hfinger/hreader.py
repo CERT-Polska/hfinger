@@ -2,14 +2,35 @@ import json
 import sys
 from hfinger.configs import FEATURESET
 from hfinger import hfinger_core, uri_reader
+import logging
+
+logger = logging.getLogger("hfinger")
 
 
 def compute_finger_raw(tcp_raw, iscrlf):
     pkt = []
-    if iscrlf:
-        pkt = bytes.fromhex(tcp_raw).split(b"\r\n\r\n")[0].decode("ascii").split("\r\n")
-    else:
-        pkt = bytes.fromhex(tcp_raw).split(b"\n\n")[0].decode("ascii").split("\n")
+    delim = b"\r\n\r\n"
+    nline = "\r\n"
+    if not iscrlf:
+        delim = b"\n\n"
+        nline = "\n"
+
+    # Decoding request's binary form into RFC compliant ASCII text. Non-ASCII characters are escaped with a backslash.
+    # If they appear in the request (rarely), their double escaped version will be processed further as an ASCII text.
+    # For example, header value of "\x9a\xfa", will be transformed to "\\x9a\\xfa",
+    # and FNV hash will be computed on the literal ASCII string of "\\x9a\\xfa", not the original bytes.
+    # This approach simplifies the code (such situations are exceptional),
+    # but still preserves the original data in some way.
+    try:
+        pkt = bytes.fromhex(tcp_raw).split(delim)[0].decode("ascii").split(nline)
+    except UnicodeDecodeError:
+        logger.info("Non-ASCII characters found in the request (non-payload part)")
+        pkt = (
+            bytes.fromhex(tcp_raw)
+            .split(delim)[0]
+            .decode("ascii", errors="backslashreplace")
+            .split(nline)
+        )
     uri_fing = uri_reader.uri_fingerprint(pkt)
     method = hfinger_core.get_method_version(pkt)
     hdr = hfinger_core.get_hdr_order(pkt)
@@ -53,10 +74,7 @@ def analyze_request_give_fingerprint(tmp, crlftagpresent):
         except UnicodeDecodeError:
             finger_pay += "N|"
         except TypeError:
-            print(
-                "Problem with string length when parsing payload",
-                file=sys.stderr,
-            )
+            logger.info("Problem with string length when parsing payload")
         else:
             finger_pay += "A|"
         payload_bytes = bytes.fromhex(payload_raw)
@@ -72,16 +90,10 @@ def give_fingerprint(treq):
     if "0d0a0d0a" in treq:
         finger_raw, finger_pay = analyze_request_give_fingerprint(treq, True)
     elif "0a0a" in treq:
-        print(
-            "No CRLFCRLF in request switching to LFLF",
-            file=sys.stderr,
-        )
+        logger.info("No CRLFCRLF in request switching to LFLF")
         finger_raw, finger_pay = analyze_request_give_fingerprint(treq, False)
     else:
-        print(
-            "No CRLFCRLF or LFLF in request",
-            file=sys.stderr,
-        )
+        logger.info("No CRLFCRLF or LFLF in request")
         finger_raw = "NULL"
     return finger_raw, finger_pay
 
@@ -120,22 +132,19 @@ def reader(data, report_mode, tsharkold):
                     framer = p["_source"]["layers"]["frame_raw"][0]
                     delimr = ethr + ipr + tcpr
                     tmp = framer.split(delimr)[1]
-                finger_raw, finger_pay = give_fingerprint(tmp)
                 if "0d0a0d0a" in tmp:
                     finger_raw, finger_pay = analyze_request_give_fingerprint(tmp, True)
                 elif "0a0a" in tmp:
-                    print(
-                        "No CRLFCRLF in request when parsing using frame_raw - switching to LFLF",
-                        file=sys.stderr,
+                    logger.info(
+                        "No CRLFCRLF in request when parsing using frame_raw - switching to LFLF"
                     )
                     finger_raw, finger_pay = analyze_request_give_fingerprint(
                         tmp, False
                     )
                 else:
                     # Unusual situation, extracting request from http_raw layer - not always dependable layer
-                    print(
-                        "Some other problem when parsing new line tags - going back to http_raw",
-                        file=sys.stderr,
+                    logger.info(
+                        "Some other problem when parsing new line tags - going back to http_raw"
                     )
                     tmp = p["_source"]["layers"]["http_raw"]
                     finger_raw, finger_pay = give_fingerprint(tmp)
@@ -151,7 +160,11 @@ def reader(data, report_mode, tsharkold):
 
 # checking format of json to choose proper version of parsing
 def reader_wrapper(fjson, rmode):
-    with open(fjson, "r") as fin:
+    with open(fjson, "r", encoding="utf-8", errors="ignore") as fin:
+        # Ignoring any possible json decoding errors. Some malware families put non-ASCII characters
+        # into popular headers. Tshark tries to put such characters directly
+        # into json file, what sometimes breaks standard json decoders.
+        # In later steps we analyze hex dump info from the json, so errors' ignoring doesn't affect the analyzed data.
         data = json.load(fin)
         if not data:
             return []

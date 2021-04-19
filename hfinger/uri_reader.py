@@ -102,6 +102,9 @@ def uri_fingerprint(pkt):
     if it < 0:
         # method has 7 chars, so no need to cut t1
         meth = t1
+    if "/" not in t:
+        # Simple URI presence check
+        return "|||||||"
     if meth in METHODS:
         # searching for URL, which should be separated from method with whitespace
         it1 = t.find(" ")

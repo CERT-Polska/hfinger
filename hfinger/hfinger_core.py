@@ -5,6 +5,10 @@ import math
 from pathlib import Path
 from hfinger.configs import AEVAL, CONNVAL, CONTENC, CACHECONT, TE, ACCPTCHAR, METHODS
 import sys
+import logging
+
+
+logger = logging.getLogger("hfinger")
 
 
 def read_config(filename):
@@ -43,14 +47,14 @@ def get_hdr_case(hdr):
 
 
 # Checking method and proto version
-def get_method_version(pkt):
+def get_method_version(request_split):
     r_ver = ""
     r_meth = ""
     # Checking if HTTP version is provided, if not assuming it is HTTP 0.9 per www.w3.org/Protocols/HTTP/Request.html
-    if " HTTP/" not in pkt[0]:
+    if " HTTP/" not in request_split[0]:
         r_ver = "9"
         # take first seven characters of the first line of request to look for method (methods have up to 7 chars)
-        t2 = pkt[0][:7].upper().strip(" ")
+        t2 = request_split[0][:7].upper().strip(" ")
         # if method shorter than 7 chars we will have part of URL in t2
         # we should find space between method and URL and cut the string on it
         it = t2.find(" ")
@@ -61,7 +65,7 @@ def get_method_version(pkt):
         if meth in METHODS:
             r_meth = meth[:2]
     else:
-        t = pkt[0].split(" HTTP/")
+        t = request_split[0].split(" HTTP/")
         t1 = t[0].lstrip(" ")
         # check if method is present by taking first 7 characters and searching there for method
         # (methods have up to 7 chars)
@@ -83,18 +87,18 @@ def get_method_version(pkt):
 
 
 # Checking header order - assuming that header field contains ":"
-def get_hdr_order(pkt):
+def get_hdr_order(request_split):
     ret = []
-    for i in pkt[1:]:
-        t = i.split(":")[0]
-        t_low = t.lower()
-        k = format(fnv1a_32(t.encode()), "x")
-        if t_low in HDRL:
-            if get_hdr_case(t):
-                k = HDRL[t_low]
+    for reqline in request_split[1:]:
+        hdr = reqline.split(":")[0]
+        hdr_lower = hdr.lower()
+        hdr_coded = format(fnv1a_32(hdr.encode()), "x")
+        if hdr_lower in HDRL:
+            if get_hdr_case(hdr):
+                hdr_coded = HDRL[hdr_lower]
             else:
-                k = "!" + HDRL[t_low]
-        ret.append(k)
+                hdr_coded = "!" + HDRL[hdr_lower]
+        ret.append(hdr_coded)
     return ",".join(ret)
 
 
@@ -127,7 +131,7 @@ def get_hdr_value(hdr, hdrname, hdr_value_table):
             if j == "":
                 return hdr_coded + format(fnv1a_32(val.encode()), "x")
             if j not in hdr_value_table:
-                print("Unknown header value - " + hdr, file=sys.stderr)
+                logger.info("Unknown header value - " + hdr)
                 return hdr_coded + format(fnv1a_32(val.encode()), "x")
             ret.append(hdr_value_table[j])
     else:
@@ -135,7 +139,7 @@ def get_hdr_value(hdr, hdrname, hdr_value_table):
         if val in hdr_value_table:
             k = hdr_value_table[val]
         else:
-            print("Unknown header value - " + hdr, file=sys.stderr)
+            logger.info("Unknown header value - " + hdr)
             k = format(fnv1a_32(val.encode()), "x")
         ret.append(k)
     return hdr_coded + ",".join(ret)
@@ -165,7 +169,7 @@ def get_content_type(hdr):
             else:
                 k = format(fnv1a_32(itv.encode()), "x")
                 if itv not in CONTENTTYPE:
-                    print("Unknown Content-Type value - " + hdr, file=sys.stderr)
+                    logger.info("Unknown Content-Type value - " + hdr)
                 else:
                     k = CONTENTTYPE[itv]
                 ret.append(k)
@@ -180,7 +184,7 @@ def get_content_type(hdr):
         else:
             k = format(fnv1a_32(val.encode()), "x")
             if val not in CONTENTTYPE:
-                print("Unknown Content-Type value - " + hdr, file=sys.stderr)
+                logger.info("Unknown Content-Type value - " + hdr)
             else:
                 k = CONTENTTYPE[val]
             ret.append(k)
@@ -194,29 +198,32 @@ def get_accept_language_value(hdr):
     return ret
 
 
-def get_pop_hdr_val(pkt):
+def get_pop_hdr_val(request_split):
     r = []
-    for i in pkt[1:]:
-        t = i.split(":")[0].lower()
-        if t == "connection":
-            r.append(get_hdr_value(i, "connection", CONNVAL))
-        elif t == "accept-encoding":
-            r.append(get_hdr_value(i, "accept-encoding", AEVAL))
-        elif t == "content-encoding":
-            r.append(get_hdr_value(i, "content-encoding", CONTENC))
-        elif t == "cache-control":
-            r.append(get_hdr_value(i, "cache-control", CACHECONT))
-        elif t == "te":
-            r.append(get_hdr_value(i, "te", TE))
-        elif t == "accept-charset":
-            r.append(get_hdr_value(i, "accept-charset", ACCPTCHAR))
-        elif t == "content-type":
-            r.append(get_content_type(i))
-        elif t == "accept":
-            r.append(get_hdr_value(i, "accept", ACCPT))
-        elif t == "accept-language":
-            r.append(get_accept_language_value(i))
-        elif t == "user-agent":
-            r.append(get_ua_value(i))
+    for reqline in request_split[1:]:
+        if ":" in reqline:
+            hdr_lower = reqline.split(":")[0].lower()
+            if hdr_lower == "connection":
+                r.append(get_hdr_value(reqline, "connection", CONNVAL))
+            elif hdr_lower == "accept-encoding":
+                r.append(get_hdr_value(reqline, "accept-encoding", AEVAL))
+            elif hdr_lower == "content-encoding":
+                r.append(get_hdr_value(reqline, "content-encoding", CONTENC))
+            elif hdr_lower == "cache-control":
+                r.append(get_hdr_value(reqline, "cache-control", CACHECONT))
+            elif hdr_lower == "te":
+                r.append(get_hdr_value(reqline, "te", TE))
+            elif hdr_lower == "accept-charset":
+                r.append(get_hdr_value(reqline, "accept-charset", ACCPTCHAR))
+            elif hdr_lower == "content-type":
+                r.append(get_content_type(reqline))
+            elif hdr_lower == "accept":
+                r.append(get_hdr_value(reqline, "accept", ACCPT))
+            elif hdr_lower == "accept-language":
+                r.append(get_accept_language_value(reqline))
+            elif hdr_lower == "user-agent":
+                r.append(get_ua_value(reqline))
+        else:
+            logger.info("No colon in line: " + reqline)
     ret = "/".join(r)
     return ret
