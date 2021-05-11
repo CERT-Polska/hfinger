@@ -11,8 +11,9 @@ The generated fingerprints are useful for grouping requests, pinpointing request
 identifying different operations of one family, 
 or discovering unknown malicious requests omitted by other security systems but which share fingerprint.
 
-An academic paper accompanies work on this tool, describing, for example, the motivation of design choices. 
-It will be published here after the peer-review process.
+[An academic paper](https://www.mdpi.com/1099-4300/23/5/507/htm) accompanies work on this tool, describing, for example, the motivation of design choices, 
+and the evaluation of the tool compared to [p0f](https://lcamtuf.coredump.cx/p0f3/), [FATT](https://github.com/0x4D31/fatt), and [Mercury](https://github.com/cisco/mercury). 
+
 
 ## Table of contents
 1. [The idea](#the-idea)
