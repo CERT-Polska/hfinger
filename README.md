@@ -52,8 +52,8 @@ Installation available from PyPI:
 
 `pip install hfinger`
 
-Hfinger has been tested on Xubuntu 20.04 LTS with `tshark` package in version `3.2.3`, 
-but should work with version `2.6.10` on Ubuntu 18.04.
+Hfinger has been tested on Xubuntu 22.04 LTS with `tshark` package in version `3.6.2`, 
+but should work with older versions like `2.6.10` on Xubuntu 18.04 or `3.2.3` on Xubuntu 20.04.
 
 Please note that as with any PoC, you should run Hfinger in a separated environment, 
 at least with Python virtual environment. Its setup is not covered here, 
