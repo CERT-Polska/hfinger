@@ -40,6 +40,8 @@ CACHECONT = OrderedDict(
         ("no-store", "ns"),
         ("no-transform", "nt"),
         ("only-if-cached", "oic"),
+        ("max-stale", "ms"),
+        ("min-fresh", "mf"),
     ]
 )
 TE = OrderedDict(

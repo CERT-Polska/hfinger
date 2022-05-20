@@ -191,6 +191,47 @@ def get_content_type(hdr):
     return hdr_coded + ",".join(ret)
 
 
+def get_cache_control_value(hdr):
+    hdr_value_table = CACHECONT
+    val = hdr.split(":")[1]
+    if val[0] == " ":
+        val = val[1:]
+    hdr_coded = HDRL["cache-control"] + ":"
+    ret = []
+    if "," in val:
+        # simple splitting of compound values
+        t = []
+        if ", " in val:
+            t = val.split(", ")
+        else:
+            t = val.split(",")
+        for j in t:
+            if j == "":
+                return hdr_coded + format(fnv1a_32(val.encode()), "x")
+            # some values have nested time values, but we drop them as they can vary much
+            if "=" in j:
+                nested_j = j.split("=")[0]
+                if nested_j in ("max-age", "max-stale", "min-fresh"):
+                    j = nested_j
+            if j not in hdr_value_table:
+                logger.info("Unknown header value - " + hdr)
+                return hdr_coded + format(fnv1a_32(val.encode()), "x")
+            ret.append(hdr_value_table[j])
+    else:
+        k = ""
+        if "=" in val:
+            nested_val = val.split("=")[0]
+            if nested_val in ("max-age", "max-stale", "min-fresh"):
+                val = nested_val
+        if val in hdr_value_table:
+            k = hdr_value_table[val]
+        else:
+            logger.info("Unknown header value - " + hdr)
+            k = format(fnv1a_32(val.encode()), "x")
+        ret.append(k)
+    return hdr_coded + ",".join(ret)
+
+
 def get_accept_language_value(hdr):
     val = hdr.split(":")[1]
     name = HDRL["accept-language"]
@@ -210,7 +251,7 @@ def get_pop_hdr_val(request_split):
             elif hdr_lower == "content-encoding":
                 r.append(get_hdr_value(reqline, "content-encoding", CONTENC))
             elif hdr_lower == "cache-control":
-                r.append(get_hdr_value(reqline, "cache-control", CACHECONT))
+                r.append(get_cache_control_value(reqline))
             elif hdr_lower == "te":
                 r.append(get_hdr_value(reqline, "te", TE))
             elif hdr_lower == "accept-charset":
