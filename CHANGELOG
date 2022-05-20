@@ -1,7 +1,6 @@
 Changes in version 0.2.2
-- added support for compound 'Content-Type' values. Values with defined time (e.g. 'max-age=N') are now truncated and only their name is processed. 
-  Before the change, they were treated as unknown values. This change will provide different fingerprint values than version 0.2.1 
-  if such 'Content-Type' values are present.
+- added support for compound 'Cache-Control' values. Values with defined time (e.g. 'max-age=N') are now truncated and only their name is processed. 
+  Before the change, they were treated as unknown values. This change will provide different fingerprint values than version 0.2.1 if such 'Cache-Control' values are present.
 - added additional 'Content-Type' values
 - tests on Ubuntu 22.04 and Tshark 3.6.2
 
