@@ -103,18 +103,14 @@ def get_hdr_order(request_split):
 
 
 def get_ua_value(hdr):
-    val = hdr.split(":")[1]
-    if val[0] == " ":
-        val = val[1:]
+    val = hdr.split(":")[1].lstrip(" ")
     name = HDRL["user-agent"]
     ret = name + ":" + format(fnv1a_32(val.encode()), "x")
     return ret
 
 
 def get_hdr_value(hdr, hdrname, hdr_value_table):
-    val = hdr.split(":")[1]
-    if val[0] == " ":
-        val = val[1:]
+    val = hdr.split(":")[1].lstrip(" ")
     hdr_coded = HDRL[hdrname] + ":"
     ret = []
     if "," in val:
@@ -122,12 +118,8 @@ def get_hdr_value(hdr, hdrname, hdr_value_table):
         if ";q=" in val:
             # we do not tokenize compound values with quality parameters at this moment
             return hdr_coded + format(fnv1a_32(val.encode()), "x")
-        t = []
-        if ", " in val:
-            t = val.split(", ")
-        else:
-            t = val.split(",")
-        for j in t:
+        vals = [x.lstrip() for x in val.split(',')]
+        for j in vals:
             if j == "":
                 return hdr_coded + format(fnv1a_32(val.encode()), "x")
             if j not in hdr_value_table:
@@ -146,17 +138,11 @@ def get_hdr_value(hdr, hdrname, hdr_value_table):
 
 
 def get_content_type(hdr):
-    val = hdr.split(":")[1]
-    if val[0] == " ":
-        val = val[1:]
+    val = hdr.split(":")[1].lstrip(" ")
     hdr_coded = HDRL["content-type"] + ":"
     ret = []
     if "," in val:
-        vals = []
-        if ", " in val:
-            vals = val.split(", ")
-        else:
-            vals = val.split(",")
+        vals = [x.lstrip() for x in val.split(',')]
         for itv in vals:
             if ";" in itv:
                 if "boundary=" in itv:
@@ -192,20 +178,13 @@ def get_content_type(hdr):
 
 
 def get_cache_control_value(hdr):
-    hdr_value_table = CACHECONT
-    val = hdr.split(":")[1]
-    if val[0] == " ":
-        val = val[1:]
+    val = hdr.split(":")[1].lstrip(" ")
     hdr_coded = HDRL["cache-control"] + ":"
     ret = []
     if "," in val:
         # simple splitting of compound values
-        t = []
-        if ", " in val:
-            t = val.split(", ")
-        else:
-            t = val.split(",")
-        for j in t:
+        vals = [x.lstrip() for x in val.split(',')]
+        for j in vals:
             if j == "":
                 return hdr_coded + format(fnv1a_32(val.encode()), "x")
             # some values have nested time values, but we drop them as they can vary much
@@ -213,18 +192,18 @@ def get_cache_control_value(hdr):
                 nested_j = j.split("=")[0]
                 if nested_j in ("max-age", "max-stale", "min-fresh"):
                     j = nested_j
-            if j not in hdr_value_table:
+            if j not in CACHECONT:
                 logger.info("Unknown header value - " + hdr)
                 return hdr_coded + format(fnv1a_32(val.encode()), "x")
-            ret.append(hdr_value_table[j])
+            ret.append(CACHECONT[j])
     else:
         k = ""
         if "=" in val:
             nested_val = val.split("=")[0]
             if nested_val in ("max-age", "max-stale", "min-fresh"):
                 val = nested_val
-        if val in hdr_value_table:
-            k = hdr_value_table[val]
+        if val in CACHECONT:
+            k = CACHECONT[val]
         else:
             logger.info("Unknown header value - " + hdr)
             k = format(fnv1a_32(val.encode()), "x")
