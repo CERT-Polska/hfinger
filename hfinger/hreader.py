@@ -1,5 +1,4 @@
 import json
-import sys
 from hfinger.configs import FEATURESET
 from hfinger import hfinger_core, uri_reader
 import logging
