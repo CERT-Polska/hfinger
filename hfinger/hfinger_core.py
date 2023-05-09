@@ -49,12 +49,15 @@ def get_hdr_case(hdr):
 def get_method_version(request_split):
     req_version = ""
     req_method = ""
-    # Checking if HTTP version is provided, if not assuming it is HTTP 0.9 per www.w3.org/Protocols/HTTP/Request.html
+    # Checking if HTTP version is provided,
+    # if not assuming it is HTTP 0.9 per www.w3.org/Protocols/HTTP/Request.html
     if " HTTP/" not in request_split[0]:
         req_version = "9"
-        # take first seven characters of the first line of request to look for method (methods have up to 7 chars)
+        # take first seven characters of the first line of request to look for method
+        # (methods have up to 7 chars)
         method_raw = request_split[0][:7].upper().strip(" ")
-        # if the method is shorter than 7 chars we will have a part of URL in the method_raw
+        # if the method is shorter than 7 chars
+        # we will have a part of URL in the method_raw
         # we should find space between method and URL and cut the string on it
         method_verb = method_raw.split()[0]
         if method_verb in METHODS:
@@ -63,10 +66,11 @@ def get_method_version(request_split):
         # split the line on HTTP definition and delete prepended whitespaces
         method_line = request_split[0].split(" HTTP/")
         method_raw = method_line[0].lstrip(" ")
-        # check if method is present by taking first 7 characters and searching there for method
-        # (methods have up to 7 chars)
-        # if the method is shorter than 7 chars we will have a part of URL in the method_raw
-        # we should find space between method and URL and cut the string on it
+        # check if method is present by taking first 7 characters and searching there
+        # for method (methods have up to 7 chars)
+        # if the method is shorter than 7 chars we will have a part of URL in
+        # the method_raw we should find space between method
+        # and URL and cut the string on it
         method_verb = method_raw.split()[0]
         if method_verb in METHODS:
             req_method = method_verb[:2]
@@ -109,7 +113,7 @@ def get_hdr_value(hdr, hdrname, hdr_value_table):
         if ";q=" in header_value:
             # we do not tokenize compound values with quality parameters at this moment
             return hdr_coded + format(fnv1a_32(header_value.encode()), "x")
-        nested_values = [value.lstrip() for value in header_value.split(',')]
+        nested_values = [value.lstrip() for value in header_value.split(",")]
         for nested_value in nested_values:
             if nested_value == "":
                 return hdr_coded + format(fnv1a_32(header_value.encode()), "x")
@@ -130,40 +134,28 @@ def get_hdr_value(hdr, hdrname, hdr_value_table):
 def get_content_type(hdr):
     header_value = hdr.split(":")[1].lstrip(" ")
     hdr_coded = HDRL["content-type"] + ":"
+    if "boundary=" in header_value:
+        # We cut the header value at the end of "boundary=" keyword.
+        # Everything after is discarded.
+        value_with_boundary = header_value.split("boundary=")[0] + "boundary="
+        return hdr_coded + format(fnv1a_32(value_with_boundary.encode()), "x")
     return_list = []
     if "," in header_value:
-        nested_values = [value.lstrip() for value in header_value.split(',')]
+        nested_values = [value.lstrip() for value in header_value.split(",")]
         for nested_value in nested_values:
-            if ";" in nested_value:
-                if "boundary=" in nested_value:
-                    bnd_ind = nested_value.index("boundary=")
-                    bnd_offset = len("boundary=")
-                    val_bnd = header_value[: bnd_ind + bnd_offset]
-                    return hdr_coded + format(fnv1a_32(val_bnd.encode()), "x")
-                else:
-                    return_list.append(format(fnv1a_32(nested_value.encode()), "x"))
-            else:
-                value_encoded = format(fnv1a_32(nested_value.encode()), "x")
-                if nested_value not in CONTENTTYPE:
-                    logger.info("Unknown Content-Type value - " + hdr)
-                else:
-                    value_encoded = CONTENTTYPE[nested_value]
-                return_list.append(value_encoded)
-    else:
-        if ";" in header_value:
-            if "boundary=" not in header_value:
-                return hdr_coded + format(fnv1a_32(header_value.encode()), "x")
-            bnd_ind = header_value.index("boundary=")
-            bnd_offset = len("boundary=")
-            val_bnd = header_value[: bnd_ind + bnd_offset]
-            return hdr_coded + format(fnv1a_32(val_bnd.encode()), "x")
-        else:
-            value_encoded = format(fnv1a_32(header_value.encode()), "x")
-            if header_value not in CONTENTTYPE:
+            try:
+                value_encoded = CONTENTTYPE[nested_value]
+            except KeyError:
                 logger.info("Unknown Content-Type value - " + hdr)
-            else:
-                value_encoded = CONTENTTYPE[header_value]
+                value_encoded = format(fnv1a_32(nested_value.encode()), "x")
             return_list.append(value_encoded)
+    else:
+        try:
+            value_encoded = CONTENTTYPE[header_value]
+        except KeyError:
+            logger.info("Unknown Content-Type value - " + hdr)
+            value_encoded = format(fnv1a_32(header_value.encode()), "x")
+        return_list.append(value_encoded)
     return hdr_coded + ",".join(return_list)
 
 
@@ -173,11 +165,12 @@ def get_cache_control_value(hdr):
     return_list = []
     if "," in header_value:
         # simple splitting of compound values
-        nested_values = [value.lstrip() for value in header_value.split(',')]
+        nested_values = [value.lstrip() for value in header_value.split(",")]
         for nested_value in nested_values:
             if nested_value == "":
                 return hdr_coded + format(fnv1a_32(header_value.encode()), "x")
-            # some values have nested time values, but we drop them as they can vary much
+            # some values have nested time values,
+            # but we drop them as they can vary much
             if "=" in nested_value:
                 nested_j = nested_value.split("=")[0]
                 if nested_j in ("max-age", "max-stale", "min-fresh"):
@@ -202,8 +195,8 @@ def get_cache_control_value(hdr):
 
 def get_accept_language_value(hdr):
     header_value = hdr.split(":")[1]
-    name = HDRL["accept-language"]
-    ret = name + ":" + format(fnv1a_32(header_value.encode()), "x")
+    header_name = HDRL["accept-language"]
+    ret = header_name + ":" + format(fnv1a_32(header_value.encode()), "x")
     return ret
 
 

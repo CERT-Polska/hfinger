@@ -3,6 +3,8 @@ Changes in version 0.2.2
   Before the change, they were treated as unknown values. This change will provide different fingerprint values than version 0.2.1 if such 'Cache-Control' values are present.
 - added additional 'Content-Type' values
 - tests on Ubuntu 22.04 and Tshark 3.6.2
+- minor code refactoring to improve code readability
+- some minor bugfixes
 
 Changes in version 0.2.1
 - fixed problems with analysis of non-ASCII characters present in request headers or URI
