@@ -90,15 +90,20 @@ def get_hdr_order(request_split):
     return ",".join(return_list)
 
 
+# Helper function for header value extraction
+def extract_header_value(header_line):
+    return header_line.split(":", 1)[1].lstrip(" ")
+
+
 def get_ua_value(hdr):
-    header_value = hdr.split(":")[1].lstrip(" ")
+    header_value = extract_header_value(hdr)
     name = HDRL["user-agent"]
     ret = name + ":" + format(fnv1a_32(header_value.encode()), "x")
     return ret
 
 
 def get_hdr_value(hdr, hdrname, hdr_value_table):
-    header_value = hdr.split(":")[1].lstrip(" ")
+    header_value = extract_header_value(hdr)
     hdr_coded = HDRL[hdrname] + ":"
     return_list = []
     if "," in header_value:
@@ -125,7 +130,7 @@ def get_hdr_value(hdr, hdrname, hdr_value_table):
 
 
 def get_content_type(hdr):
-    header_value = hdr.split(":")[1].lstrip(" ")
+    header_value = extract_header_value(hdr)
     hdr_coded = HDRL["content-type"] + ":"
     if "boundary=" in header_value:
         # We cut the header value at the end of "boundary=" keyword.
@@ -153,7 +158,7 @@ def get_content_type(hdr):
 
 
 def get_cache_control_value(hdr):
-    header_value = hdr.split(":")[1].lstrip(" ")
+    header_value = extract_header_value(hdr)
     hdr_coded = HDRL["cache-control"] + ":"
     return_list = []
     if "," in header_value:
@@ -187,7 +192,7 @@ def get_cache_control_value(hdr):
 
 
 def get_accept_language_value(hdr):
-    header_value = hdr.split(":")[1]
+    header_value = hdr.split(":", 1)[1]
     header_name = HDRL["accept-language"]
     ret = header_name + ":" + format(fnv1a_32(header_value.encode()), "x")
     return ret
