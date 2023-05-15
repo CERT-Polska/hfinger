@@ -49,32 +49,25 @@ def get_hdr_case(hdr):
 def get_method_version(request_split):
     req_version = ""
     req_method = ""
+    method_line = request_split[0]
     # Checking if HTTP version is provided,
     # if not assuming it is HTTP 0.9 per www.w3.org/Protocols/HTTP/Request.html
     if " HTTP/" not in request_split[0]:
         req_version = "9"
-        # take first seven characters of the first line of request to look for method
-        # (methods have up to 7 chars)
-        method_raw = request_split[0][:7].upper().strip(" ")
-        # if the method is shorter than 7 chars
-        # we will have a part of URL in the method_raw
-        # we should find space between method and URL and cut the string on it
-        method_verb = method_raw.split()[0]
-        if method_verb in METHODS:
+        method_raw = method_line.strip(" ").split()[0]
+        # We analyze method's verb only if it is shorter or equal to 7 chars
+        # as all registered methods are at most this long.
+        method_verb = method_raw.upper()
+        if len(method_verb) <= 7 and method_verb in METHODS:
             req_method = method_verb[:2]
     else:
         # split the line on HTTP definition and delete prepended whitespaces
-        method_line = request_split[0].split(" HTTP/")
-        method_raw = method_line[0].lstrip(" ")
-        # check if method is present by taking first 7 characters and searching there
-        # for method (methods have up to 7 chars)
-        # if the method is shorter than 7 chars we will have a part of URL in
-        # the method_raw we should find space between method
-        # and URL and cut the string on it
-        method_verb = method_raw.split()[0]
+        method_line_split = method_line.split(" HTTP/")
+        method_raw = method_line_split[0].lstrip(" ")
+        method_verb = method_raw.split()[0].upper()
         if method_verb in METHODS:
             req_method = method_verb[:2]
-            if "1.1" in method_line[1]:
+            if "1.1" in method_line_split[1]:
                 req_version = "1"
             else:
                 req_version = "0"
