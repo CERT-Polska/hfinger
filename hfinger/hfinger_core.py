@@ -4,7 +4,6 @@ import json
 import math
 from pathlib import Path
 from hfinger.configs import AEVAL, CONNVAL, CONTENC, CACHECONT, TE, ACCPTCHAR, METHODS
-import sys
 import logging
 
 
@@ -36,8 +35,8 @@ def get_length(bstr):
 
 def get_hdr_case(hdr):
     if "-" in hdr:
-        t = hdr.split("-")
-        for i in t:
+        compound_hdr = hdr.split("-")
+        for i in compound_hdr:
             if i[0].islower():
                 # Is any first letter in compound header name written with lower case?
                 return False
@@ -48,47 +47,36 @@ def get_hdr_case(hdr):
 
 # Checking method and proto version
 def get_method_version(request_split):
-    r_ver = ""
-    r_meth = ""
-    # Checking if HTTP version is provided, if not assuming it is HTTP 0.9 per www.w3.org/Protocols/HTTP/Request.html
+    req_version = ""
+    req_method = ""
+    method_line = request_split[0]
+    # Checking if HTTP version is provided,
+    # if not assuming it is HTTP 0.9 per www.w3.org/Protocols/HTTP/Request.html
     if " HTTP/" not in request_split[0]:
-        r_ver = "9"
-        # take first seven characters of the first line of request to look for method (methods have up to 7 chars)
-        t2 = request_split[0][:7].upper().strip(" ")
-        # if method shorter than 7 chars we will have part of URL in t2
-        # we should find space between method and URL and cut the string on it
-        it = t2.find(" ")
-        meth = t2[:it]
-        if it < 0:
-            # method has 7 chars, so no need to cut t2
-            meth = t2
-        if meth in METHODS:
-            r_meth = meth[:2]
+        req_version = "9"
+        method_raw = method_line.strip(" ").split()[0]
+        # We analyze method's verb only if it is shorter or equal to 7 chars
+        # as all registered methods are at most this long.
+        method_verb = method_raw.upper()
+        if len(method_verb) <= 7 and method_verb in METHODS:
+            req_method = method_verb[:2]
     else:
-        t = request_split[0].split(" HTTP/")
-        t1 = t[0].lstrip(" ")
-        # check if method is present by taking first 7 characters and searching there for method
-        # (methods have up to 7 chars)
-        t2 = t1[:7].upper().strip(" ")
-        # if method shorter than 7 chars we will have part of URL in t2
-        # we should find space between method and URL and cut the string on it
-        it = t2.find(" ")
-        meth = t2[:it]
-        if it < 0:
-            # method has 7 chars, so no need to cut t2
-            meth = t2
-        if meth in METHODS:
-            r_meth = meth[:2]
-            if "1.1" in t[1]:
-                r_ver = "1"
+        # split the line on HTTP definition and delete prepended whitespaces
+        method_line_split = method_line.split(" HTTP/")
+        method_raw = method_line_split[0].lstrip(" ")
+        method_verb = method_raw.split()[0].upper()
+        if method_verb in METHODS:
+            req_method = method_verb[:2]
+            if "1.1" in method_line_split[1]:
+                req_version = "1"
             else:
-                r_ver = "0"
-    return "|".join((r_meth, r_ver))
+                req_version = "0"
+    return "|".join((req_method, req_version))
 
 
 # Checking header order - assuming that header field contains ":"
 def get_hdr_order(request_split):
-    ret = []
+    return_list = []
     for reqline in request_split[1:]:
         hdr = reqline.split(":")[0]
         hdr_lower = hdr.lower()
@@ -98,132 +86,144 @@ def get_hdr_order(request_split):
                 hdr_coded = HDRL[hdr_lower]
             else:
                 hdr_coded = "!" + HDRL[hdr_lower]
-        ret.append(hdr_coded)
-    return ",".join(ret)
+        return_list.append(hdr_coded)
+    return ",".join(return_list)
+
+
+# Helper function for header value extraction
+def extract_header_value(header_line):
+    return header_line.split(":", 1)[1].lstrip(" ")
 
 
 def get_ua_value(hdr):
-    val = hdr.split(":")[1]
-    if val[0] == " ":
-        val = val[1:]
+    header_value = extract_header_value(hdr)
     name = HDRL["user-agent"]
-    ret = name + ":" + format(fnv1a_32(val.encode()), "x")
+    ret = name + ":" + format(fnv1a_32(header_value.encode()), "x")
     return ret
 
 
 def get_hdr_value(hdr, hdrname, hdr_value_table):
-    val = hdr.split(":")[1]
-    if val[0] == " ":
-        val = val[1:]
+    header_value = extract_header_value(hdr)
     hdr_coded = HDRL[hdrname] + ":"
-    ret = []
-    if "," in val:
+    return_list = []
+    if "," in header_value:
         # simple splitting of compound values
-        if ";q=" in val:
+        if ";q=" in header_value:
             # we do not tokenize compound values with quality parameters at this moment
-            return hdr_coded + format(fnv1a_32(val.encode()), "x")
-        t = []
-        if ", " in val:
-            t = val.split(", ")
-        else:
-            t = val.split(",")
-        for j in t:
-            if j == "":
-                return hdr_coded + format(fnv1a_32(val.encode()), "x")
-            if j not in hdr_value_table:
+            return hdr_coded + format(fnv1a_32(header_value.encode()), "x")
+        nested_values = [value.lstrip() for value in header_value.split(",")]
+        for nested_value in nested_values:
+            if nested_value == "":
+                return hdr_coded + format(fnv1a_32(header_value.encode()), "x")
+            if nested_value not in hdr_value_table:
                 logger.info("Unknown header value - " + hdr)
-                return hdr_coded + format(fnv1a_32(val.encode()), "x")
-            ret.append(hdr_value_table[j])
+                return hdr_coded + format(fnv1a_32(header_value.encode()), "x")
+            return_list.append(hdr_value_table[nested_value])
     else:
-        k = ""
-        if val in hdr_value_table:
-            k = hdr_value_table[val]
-        else:
+        try:
+            value_encoded = hdr_value_table[header_value]
+        except KeyError:
             logger.info("Unknown header value - " + hdr)
-            k = format(fnv1a_32(val.encode()), "x")
-        ret.append(k)
-    return hdr_coded + ",".join(ret)
+            value_encoded = format(fnv1a_32(header_value.encode()), "x")
+        return_list.append(value_encoded)
+    return hdr_coded + ",".join(return_list)
 
 
 def get_content_type(hdr):
-    val = hdr.split(":")[1]
-    if val[0] == " ":
-        val = val[1:]
+    header_value = extract_header_value(hdr)
     hdr_coded = HDRL["content-type"] + ":"
-    ret = []
-    if "," in val:
-        vals = []
-        if ", " in val:
-            vals = val.split(", ")
-        else:
-            vals = val.split(",")
-        for itv in vals:
-            if ";" in itv:
-                if "boundary=" in itv:
-                    bnd_ind = itv.index("boundary=")
-                    bnd_offset = len("boundary=")
-                    val_bnd = val[: bnd_ind + bnd_offset]
-                    return hdr_coded + format(fnv1a_32(val_bnd.encode()), "x")
-                else:
-                    ret.append(format(fnv1a_32(itv.encode()), "x"))
-            else:
-                k = format(fnv1a_32(itv.encode()), "x")
-                if itv not in CONTENTTYPE:
-                    logger.info("Unknown Content-Type value - " + hdr)
-                else:
-                    k = CONTENTTYPE[itv]
-                ret.append(k)
-    else:
-        if ";" in val:
-            if "boundary=" not in val:
-                return hdr_coded + format(fnv1a_32(val.encode()), "x")
-            bnd_ind = val.index("boundary=")
-            bnd_offset = len("boundary=")
-            val_bnd = val[: bnd_ind + bnd_offset]
-            return hdr_coded + format(fnv1a_32(val_bnd.encode()), "x")
-        else:
-            k = format(fnv1a_32(val.encode()), "x")
-            if val not in CONTENTTYPE:
+    if "boundary=" in header_value:
+        # We cut the header value at the end of "boundary=" keyword.
+        # Everything after is discarded.
+        value_with_boundary = header_value.split("boundary=")[0] + "boundary="
+        return hdr_coded + format(fnv1a_32(value_with_boundary.encode()), "x")
+    return_list = []
+    if "," in header_value:
+        nested_values = [value.lstrip() for value in header_value.split(",")]
+        for nested_value in nested_values:
+            try:
+                value_encoded = CONTENTTYPE[nested_value]
+            except KeyError:
                 logger.info("Unknown Content-Type value - " + hdr)
-            else:
-                k = CONTENTTYPE[val]
-            ret.append(k)
-    return hdr_coded + ",".join(ret)
+                value_encoded = format(fnv1a_32(nested_value.encode()), "x")
+            return_list.append(value_encoded)
+    else:
+        try:
+            value_encoded = CONTENTTYPE[header_value]
+        except KeyError:
+            logger.info("Unknown Content-Type value - " + hdr)
+            value_encoded = format(fnv1a_32(header_value.encode()), "x")
+        return_list.append(value_encoded)
+    return hdr_coded + ",".join(return_list)
+
+
+def get_cache_control_value(hdr):
+    header_value = extract_header_value(hdr)
+    hdr_coded = HDRL["cache-control"] + ":"
+    return_list = []
+    if "," in header_value:
+        # simple splitting of compound values
+        nested_values = [value.lstrip() for value in header_value.split(",")]
+        for nested_value in nested_values:
+            if nested_value == "":
+                return hdr_coded + format(fnv1a_32(header_value.encode()), "x")
+            # some values have nested time values,
+            # but we drop them as they can vary much
+            if "=" in nested_value:
+                nested_j = nested_value.split("=")[0]
+                if nested_j in ("max-age", "max-stale", "min-fresh"):
+                    nested_value = nested_j
+            if nested_value not in CACHECONT:
+                logger.info("Unknown header value - " + hdr)
+                return hdr_coded + format(fnv1a_32(header_value.encode()), "x")
+            return_list.append(CACHECONT[nested_value])
+    else:
+        if "=" in header_value:
+            nested_val = header_value.split("=")[0]
+            if nested_val in ("max-age", "max-stale", "min-fresh"):
+                header_value = nested_val
+        try:
+            value_encoded = CACHECONT[header_value]
+        except KeyError:
+            logger.info("Unknown header value - " + hdr)
+            value_encoded = format(fnv1a_32(header_value.encode()), "x")
+        return_list.append(value_encoded)
+    return hdr_coded + ",".join(return_list)
 
 
 def get_accept_language_value(hdr):
-    val = hdr.split(":")[1]
-    name = HDRL["accept-language"]
-    ret = name + ":" + format(fnv1a_32(val.encode()), "x")
+    header_value = hdr.split(":", 1)[1]
+    header_name = HDRL["accept-language"]
+    ret = header_name + ":" + format(fnv1a_32(header_value.encode()), "x")
     return ret
 
 
 def get_pop_hdr_val(request_split):
-    r = []
+    return_list = []
     for reqline in request_split[1:]:
         if ":" in reqline:
             hdr_lower = reqline.split(":")[0].lower()
             if hdr_lower == "connection":
-                r.append(get_hdr_value(reqline, "connection", CONNVAL))
+                return_list.append(get_hdr_value(reqline, "connection", CONNVAL))
             elif hdr_lower == "accept-encoding":
-                r.append(get_hdr_value(reqline, "accept-encoding", AEVAL))
+                return_list.append(get_hdr_value(reqline, "accept-encoding", AEVAL))
             elif hdr_lower == "content-encoding":
-                r.append(get_hdr_value(reqline, "content-encoding", CONTENC))
+                return_list.append(get_hdr_value(reqline, "content-encoding", CONTENC))
             elif hdr_lower == "cache-control":
-                r.append(get_hdr_value(reqline, "cache-control", CACHECONT))
+                return_list.append(get_cache_control_value(reqline))
             elif hdr_lower == "te":
-                r.append(get_hdr_value(reqline, "te", TE))
+                return_list.append(get_hdr_value(reqline, "te", TE))
             elif hdr_lower == "accept-charset":
-                r.append(get_hdr_value(reqline, "accept-charset", ACCPTCHAR))
+                return_list.append(get_hdr_value(reqline, "accept-charset", ACCPTCHAR))
             elif hdr_lower == "content-type":
-                r.append(get_content_type(reqline))
+                return_list.append(get_content_type(reqline))
             elif hdr_lower == "accept":
-                r.append(get_hdr_value(reqline, "accept", ACCPT))
+                return_list.append(get_hdr_value(reqline, "accept", ACCPT))
             elif hdr_lower == "accept-language":
-                r.append(get_accept_language_value(reqline))
+                return_list.append(get_accept_language_value(reqline))
             elif hdr_lower == "user-agent":
-                r.append(get_ua_value(reqline))
+                return_list.append(get_ua_value(reqline))
         else:
             logger.info("No colon in line: " + reqline)
-    ret = "/".join(r)
+    ret = "/".join(return_list)
     return ret
